@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CopyLink from "@/components/CopyLink";
 import Bracket from "./Bracket";
 import PlayerBar from "@/components/PlayerBar";
@@ -20,6 +20,19 @@ export default function LadderPlay({ initial, userId }: Props) {
     [state.tracks],
   );
   const trackId = player.status.trackId;
+
+  // Stop the music whenever the view changes: start, every pick, undo,
+  // and the winner screen.
+  const decided = state.matches.filter((m) => m.winner).length;
+  const viewKey = `${state.status}:${decided}`;
+  const lastViewKey = useRef(viewKey);
+  const { stop } = player;
+  useEffect(() => {
+    if (lastViewKey.current === viewKey) return;
+    lastViewKey.current = viewKey;
+    stop();
+  }, [viewKey, stop]);
+
   return (
     <>
       <LadderBody
@@ -80,7 +93,10 @@ function LadderBody({
       if (res.ok) setState(data);
       else if (data.state) setState(data.state);
       else if (data.error === "taken") window.location.reload();
-      else setError("Coś poszło nie tak. Spróbuj ponownie.");
+      else
+        setError(
+          `Coś poszło nie tak. Spróbuj ponownie.${data.detail ? ` (${data.detail})` : ""}`,
+        );
     } catch {
       setError("Brak połączenia. Spróbuj ponownie.");
     } finally {
@@ -128,6 +144,14 @@ function LadderBody({
             />
           </div>
         )}
+        {isPlayer && (
+          <div>
+            <button className="button secondary" disabled={busy} onClick={() => post("undo")}>
+              ↶ Cofnij ostatni wybór
+            </button>
+          </div>
+        )}
+        {error && <p className="error">{error}</p>}
         {notice}
         <h2>Przebieg drabinki</h2>
         <Bracket
@@ -276,12 +300,23 @@ function LadderBody({
               <PlayButton
                 playing={player.playingId === t.id}
                 onClick={() => player.toggle(t.id)}
+                wide
               />
             </div>
           </div>
         ))}
       </div>
-      <p className="muted small">Dotknij piosenki, żeby ją wybrać. ▶ odtwarza ją (opcjonalnie).</p>
+      <p className="muted small">
+        Dotknij okładki lub tytułu, żeby wybrać piosenkę. Przycisk pod spodem
+        tylko ją odtwarza (opcjonalnie).
+      </p>
+      {decided > 0 && (
+        <div>
+          <button className="button secondary" disabled={busy} onClick={() => post("undo")}>
+            ↶ Cofnij ostatni wybór
+          </button>
+        </div>
+      )}
       {error && <p className="error">{error}</p>}
       {notice}
       <h2>Drabinka</h2>
@@ -303,11 +338,20 @@ function PlayButton({
   playing,
   onClick,
   label,
+  wide,
 }: {
   playing: boolean;
   onClick: () => void;
   label?: boolean;
+  wide?: boolean;
 }) {
+  if (wide) {
+    return (
+      <button className="play-wide" onClick={onClick} aria-label={playing ? "Zatrzymaj" : "Odtwórz"}>
+        {playing ? "⏸ Pauza" : "▶ Odtwórz"}
+      </button>
+    );
+  }
   return (
     <button
       className={label ? "button secondary" : "play"}
