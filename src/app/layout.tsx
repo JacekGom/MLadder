@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import InAppBrowserHint from "@/components/InAppBrowserHint";
 
 export const metadata: Metadata = {
   title: "Drabinka muzyczna",
@@ -18,7 +19,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pl">
-      <body>{children}</body>
+      <body>
+        <InAppBrowserHint />
+        {children}
+      </body>
     </html>
   );
 }
