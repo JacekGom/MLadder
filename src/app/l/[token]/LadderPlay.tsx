@@ -488,6 +488,12 @@ function Notice({ notice, onClose }: { notice: PlayerNotice; onClose: () => void
           ), wróć tutaj, a kolejne piosenki będą już grały z poziomu drabinki.
         </span>
       )}
+      {notice.kind === "browser_player" && (
+        <span>
+          Odtwarzacz w przeglądarce jeszcze się nie uruchomił. Odczekaj chwilę i kliknij ▶
+          ponownie (w razie potrzeby odśwież stronę).
+        </span>
+      )}
       {notice.kind === "premium" && <span>Odtwarzanie wymaga Spotify Premium.</span>}
       {notice.kind === "error" && (
         <span>
