@@ -53,6 +53,7 @@ declare global {
 
 export type PlayerNotice =
   | { kind: "open_app"; trackId: string }
+  | { kind: "browser_player" }
   | { kind: "premium" }
   | { kind: "error"; detail?: string };
 
@@ -98,6 +99,9 @@ export function usePlayer() {
   const playerRef = useRef<SdkPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(null);
   const requestedRef = useRef<string | null>(null);
+  // Desktop in-browser player: "loading" until Spotify registers this tab
+  // as a device, "failed" if it can't (then we use Spotify Connect).
+  const sdkRef = useRef<"off" | "loading" | "ready" | "failed">("off");
   // Ignore polled positions for a moment after a seek so the slider
   // doesn't jump back.
   const seekLockRef = useRef(0);
@@ -119,6 +123,7 @@ export function usePlayer() {
   useEffect(() => {
     if (isMobile()) return;
     let cancelled = false;
+    sdkRef.current = "loading";
 
     const init = () => {
       if (cancelled || !window.Spotify) return;
@@ -131,12 +136,14 @@ export function usePlayer() {
       });
       player.addListener("ready", (({ device_id }: { device_id: string }) => {
         deviceIdRef.current = device_id;
+        sdkRef.current = "ready";
         player.getVolume().then((v) =>
           setStatus((prev) => ({ ...prev, volume: Math.round(v * 100) })),
         );
       }) as (arg: never) => void);
       player.addListener("not_ready", (() => {
         deviceIdRef.current = null;
+        sdkRef.current = "loading";
       }) as (arg: never) => void);
       player.addListener("player_state_changed", ((s: SdkState | null) =>
         applySdkState(s)) as (arg: never) => void);
@@ -145,6 +152,7 @@ export function usePlayer() {
         player.addListener(ev, (() => {
           deviceIdRef.current = null;
           playerRef.current = null;
+          sdkRef.current = "failed";
         }) as (arg: never) => void);
       }
       player.connect();
@@ -166,6 +174,7 @@ export function usePlayer() {
 
     return () => {
       cancelled = true;
+      sdkRef.current = "off";
       playerRef.current?.disconnect();
       playerRef.current = null;
       deviceIdRef.current = null;
@@ -222,15 +231,43 @@ export function usePlayer() {
     }, 4000);
   }, []);
 
+  /**
+   * On desktop, waits until the in-browser player is registered with
+   * Spotify. Without this, a click right after the page opens (e.g. on the
+   * winner of a finished ladder) had no device id yet and the song went to
+   * another Spotify device, such as the user's sleeping phone.
+   */
+  const waitForSdk = useCallback(async () => {
+    const until = Date.now() + 10000;
+    while (sdkRef.current === "loading" && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return deviceIdRef.current;
+  }, []);
+
   const play = useCallback(async (trackId: string) => {
     setNotice(null);
     // Must run inside the click for browsers' autoplay rules.
     await playerRef.current?.activateElement().catch(() => {});
-    const res = await fetch("/api/spotify/play", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ trackId, deviceId: deviceIdRef.current ?? undefined }),
-    });
+    const desktop = sdkRef.current !== "off" && sdkRef.current !== "failed";
+    const deviceId = desktop ? await waitForSdk() : null;
+    if (desktop && !deviceId) {
+      setNotice({ kind: "browser_player" });
+      return;
+    }
+    const send = () =>
+      fetch("/api/spotify/play", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackId, deviceId: deviceId ?? undefined }),
+      });
+    let res = await send();
+    // A freshly registered browser player can be unknown to Spotify for a
+    // few seconds (404 → no_device). Retry instead of giving up.
+    for (let i = 0; deviceId && res.status === 409 && i < 4; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      res = await send();
+    }
     if (res.ok) {
       requestedRef.current = trackId;
       setStatus((prev) => ({ ...prev, trackId, paused: false, positionMs: 0 }));
@@ -238,10 +275,11 @@ export function usePlayer() {
       return;
     }
     const { error, detail } = await res.json().catch(() => ({ error: "error" }));
-    if (error === "no_device") setNotice({ kind: "open_app", trackId });
+    if (error === "no_device")
+      setNotice(deviceId ? { kind: "browser_player" } : { kind: "open_app", trackId });
     else if (error === "premium_required") setNotice({ kind: "premium" });
     else setNotice({ kind: "error", detail });
-  }, [verifyRemote]);
+  }, [verifyRemote, waitForSdk]);
 
   const pause = useCallback(async () => {
     setStatus((prev) => ({ ...prev, paused: true }));
