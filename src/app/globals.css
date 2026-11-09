@@ -653,3 +653,23 @@ main.has-player {
 blockquote {
   margin: 0;
 }
+
+.ladder-list li > a {
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: var(--muted, #a7a7a7);
+  font-size: 1.1rem;
+  padding: 8px;
+  margin: -8px -8px -8px 0;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}

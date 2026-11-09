@@ -18,7 +18,7 @@ hosting Vercel.
      logować (w trybie deweloperskim tylko one mają dostęp).
 2. **Supabase.** Załóż projekt na [supabase.com](https://supabase.com), otwórz
    *SQL Editor* i uruchom po kolei zawartość plików z `supabase/migrations/`
-   (`0001_init.sql`, `0002_ladder_functions.sql`, `0003_undo_vote.sql`, `0004_name_and_replay.sql`, `0005_return_and_copy.sql`).
+   (`0001_init.sql`, `0002_ladder_functions.sql`, `0003_undo_vote.sql`, `0004_name_and_replay.sql`, `0005_return_and_copy.sql`, `0006_edit_and_delete.sql`).
    Adres i klucz *service_role* znajdziesz w *Project Settings → API*.
    (Bez Supabase logowanie też zadziała, tylko nic nie zostanie zapisane.)
 3. **Zmienne.** Skopiuj `.env.example` do `.env.local` i uzupełnij.

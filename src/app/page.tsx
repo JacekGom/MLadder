@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import Link from "next/link";
+import DeleteLadderButton from "@/components/DeleteLadderButton";
 import { getMe, type SpotifyUser } from "@/lib/spotify";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -64,6 +65,7 @@ export default async function Home({
       .from("ladders")
       .select("*")
       .eq("sender_id", me.id)
+      .is("sender_hidden_at", null)
       .order("created_at", { ascending: false })
       .limit(20);
     sent = data ?? [];
@@ -72,6 +74,7 @@ export default async function Home({
       .select("*")
       .eq("recipient_id", me.id)
       .neq("sender_id", me.id)
+      .is("recipient_hidden_at", null)
       .order("created_at", { ascending: false })
       .limit(20);
     received = rec ?? [];
@@ -123,6 +126,10 @@ export default async function Home({
                     <span className="muted">
                       {l.size} · {sentStatus(l)}
                     </span>
+                    <DeleteLadderButton
+                      token={l.share_token}
+                      label={l.name || l.message || `Drabinka ${l.size} piosenek`}
+                    />
                   </li>
                 ))}
               </ul>
@@ -141,6 +148,10 @@ export default async function Home({
                     <span className="muted">
                       {l.size} · {receivedStatus(l)}
                     </span>
+                    <DeleteLadderButton
+                      token={l.share_token}
+                      label={l.name || l.message || `Drabinka ${l.size} piosenek`}
+                    />
                   </li>
                 ))}
               </ul>
