@@ -18,12 +18,17 @@ type Device = {
  * after it is paused or backgrounded, even though it is still listed and
  * can be woken up by addressing it directly.
  */
-async function pickDevice(token: string): Promise<Device | null> {
+async function pickDevice(token: string, mobile: boolean): Promise<Device | null> {
   const { devices } = await spotifyGet<{ devices: Device[] }>("/me/player/devices", token);
   const usable = devices.filter((d) => d.id && !d.is_restricted);
+  // On a phone, prefer the phone: when the same account also has Spotify
+  // open on a computer, the computer may be the "active" device, and the
+  // song would start there instead of on the phone in the user's hand.
+  const phones = mobile ? usable.filter((d) => d.type === "Smartphone") : [];
   return (
+    phones.find((d) => d.is_active) ??
+    phones[0] ??
     usable.find((d) => d.is_active) ??
-    usable.find((d) => d.type === "Smartphone") ??
     usable[0] ??
     null
   );
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
   const auth = await getRouteAuth();
   if (!auth) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  let body: { trackId?: unknown; deviceId?: unknown };
+  let body: { trackId?: unknown; deviceId?: unknown; mobile?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -55,7 +60,7 @@ export async function POST(req: NextRequest) {
       : null;
   if (!deviceId) {
     try {
-      deviceId = (await pickDevice(auth.token))?.id ?? null;
+      deviceId = (await pickDevice(auth.token, body.mobile === true))?.id ?? null;
     } catch (e) {
       console.error("devices failed", e);
     }

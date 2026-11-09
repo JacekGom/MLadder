@@ -1,14 +1,15 @@
-import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNext } from "@/lib/auth";
 import { getSession } from "@/lib/session";
 import { authorizeUrl } from "@/lib/spotify";
+import { makeState } from "@/lib/oauthState";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  const state = randomBytes(16).toString("hex");
+  const next = safeNext(req.nextUrl.searchParams.get("next"));
+  const state = makeState(next);
   session.oauthState = state;
-  session.loginNext = safeNext(req.nextUrl.searchParams.get("next"));
+  session.loginNext = next;
   await session.save();
   return NextResponse.redirect(authorizeUrl(state));
 }

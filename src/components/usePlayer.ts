@@ -279,7 +279,7 @@ export function usePlayer() {
       fetch("/api/spotify/play", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trackId, deviceId: deviceId ?? undefined }),
+        body: JSON.stringify({ trackId, deviceId: deviceId ?? undefined, mobile: isMobile() }),
       });
     let res = await send();
     // A freshly registered browser player can be unknown to Spotify for a
