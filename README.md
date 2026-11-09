@@ -38,7 +38,7 @@ hosting Vercel.
 ## Plan
 
 1. Szkielet i logowanie przez Spotify ✅
-2. Wysyłanie zestawu (top 50 z ostatniego miesiąca + wyszukiwarka, wybór 2^n
+2. Wysyłanie zestawu ✅ (top 50 z ostatniego miesiąca + wyszukiwarka, wybór 2^n
    piosenek, link dla odbiorcy)
 3. Wypełnianie drabinki (losowe rozstawienie, pojedynki, opcjonalne
    odtwarzanie)

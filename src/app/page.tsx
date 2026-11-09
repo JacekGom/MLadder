@@ -1,6 +1,22 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import Link from "next/link";
 import { getMe, type SpotifyUser } from "@/lib/spotify";
+import { supabaseAdmin } from "@/lib/supabase";
+
+const STATUS: Record<string, string> = {
+  pending: "czeka na odbiorcę",
+  in_progress: "w trakcie",
+  done: "rozstrzygnięta",
+};
+
+type SentLadder = {
+  share_token: string;
+  size: number;
+  status: string;
+  message: string | null;
+  created_at: string;
+};
 
 const ERRORS: Record<string, string> = {
   access_denied: "Logowanie anulowane w Spotify.",
@@ -26,6 +42,18 @@ export default async function Home({
     } catch (e) {
       console.error(e);
     }
+  }
+
+  let sent: SentLadder[] = [];
+  const db = supabaseAdmin();
+  if (me && db) {
+    const { data } = await db
+      .from("ladders")
+      .select("share_token, size, status, message, created_at")
+      .eq("sender_id", me.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    sent = data ?? [];
   }
 
   return (
@@ -56,7 +84,31 @@ export default async function Home({
               )}
             </div>
           </div>
-          <form action="/api/auth/logout" method="post" style={{ marginTop: 16 }}>
+          <p style={{ marginTop: 24 }}>
+            <Link className="button" href="/new">
+              Nowa drabinka
+            </Link>
+          </p>
+
+          {sent.length > 0 && (
+            <section style={{ marginTop: 24 }}>
+              <h2>Wysłane</h2>
+              <ul className="ladder-list">
+                {sent.map((l) => (
+                  <li key={l.share_token}>
+                    <Link href={`/l/${l.share_token}`}>
+                      {l.message || `Drabinka ${l.size} piosenek`}
+                    </Link>
+                    <span className="muted">
+                      {l.size} · {STATUS[l.status] ?? l.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <form action="/api/auth/logout" method="post" style={{ marginTop: 24 }}>
             <button className="button secondary" type="submit">
               Wyloguj
             </button>
