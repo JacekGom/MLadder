@@ -9,10 +9,9 @@ type Props = { top: TrackSummary[]; topError: boolean };
 export default function LadderBuilder({ top, topError }: Props) {
   const [size, setSize] = useState<LadderSize>(8);
   const [selected, setSelected] = useState<TrackSummary[]>([]);
-  const [tab, setTab] = useState<"top" | "search">(top.length ? "top" : "search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TrackSummary[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -32,7 +31,7 @@ export default function LadderBuilder({ top, topError }: Props) {
     }
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      setSearching(true);
+      setLoading(true);
       setSearchError(false);
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
@@ -43,7 +42,7 @@ export default function LadderBuilder({ top, topError }: Props) {
       } catch (e) {
         if ((e as Error).name !== "AbortError") setSearchError(true);
       } finally {
-        if (!controller.signal.aborted) setSearching(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 300);
     return () => {
@@ -140,7 +139,8 @@ export default function LadderBuilder({ top, topError }: Props) {
     );
   }
 
-  const list = tab === "top" ? top : results;
+  const searching = query.trim().length > 0;
+  const list = searching ? results : top;
 
   return (
     <section className="stack">
@@ -191,43 +191,41 @@ export default function LadderBuilder({ top, topError }: Props) {
         </details>
       )}
 
-      <div className="tabs">
-        <button className={tab === "top" ? "active" : ""} onClick={() => setTab("top")}>
-          Twoje top 50
-        </button>
-        <button className={tab === "search" ? "active" : ""} onClick={() => setTab("search")}>
-          Szukaj
-        </button>
-      </div>
+      <input
+        className="input"
+        type="search"
+        placeholder="🔍 Szukaj dowolnej piosenki w Spotify"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
 
-      {tab === "top" && (
+      {searching ? (
         <>
+          <p className="label">Wyniki wyszukiwania</p>
+          {loading && <p className="muted">Szukam…</p>}
+          {searchError && <p className="error">Wyszukiwanie nie powiodło się.</p>}
+          {!loading && !searchError && results.length === 0 && (
+            <p className="muted">Nic nie znaleziono.</p>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+            <p className="label" style={{ margin: 0 }}>
+              Twoje top 50 z ostatniego miesiąca
+            </p>
+            {top.length > 0 && !full && (
+              <button className="button secondary" onClick={fillFromTop}>
+                Uzupełnij z top ({size - selected.length})
+              </button>
+            )}
+          </div>
           {topError && <p className="error">Nie udało się pobrać Twoich top utworów.</p>}
           {!topError && top.length === 0 && (
             <p className="muted">
               Spotify nie ma jeszcze Twoich top utworów z ostatniego miesiąca. Użyj wyszukiwarki.
             </p>
           )}
-          {top.length > 0 && !full && (
-            <button className="button secondary" onClick={fillFromTop}>
-              Uzupełnij z top ({size - selected.length})
-            </button>
-          )}
-        </>
-      )}
-
-      {tab === "search" && (
-        <>
-          <input
-            className="input"
-            type="search"
-            autoFocus
-            placeholder="Tytuł lub wykonawca"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {searching && <p className="muted">Szukam…</p>}
-          {searchError && <p className="error">Wyszukiwanie nie powiodło się.</p>}
         </>
       )}
 
