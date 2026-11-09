@@ -3,22 +3,63 @@
 import { useMemo, useState } from "react";
 import CopyLink from "@/components/CopyLink";
 import Bracket from "./Bracket";
+import PlayerBar from "@/components/PlayerBar";
 import { usePlayer, type PlayerNotice } from "@/components/usePlayer";
 import { nextMatch, roundCount, roundName, type LadderState } from "@/lib/ladder";
 import type { TrackSummary } from "@/lib/tracks";
 
 type Props = { initial: LadderState; userId: string };
 
+type Player = ReturnType<typeof usePlayer>;
+
 export default function LadderPlay({ initial, userId }: Props) {
   const [state, setState] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const player = usePlayer();
-
   const byId = useMemo(
     () => new Map(state.tracks.map((t) => [t.id, t])),
     [state.tracks],
   );
+  const trackId = player.status.trackId;
+  return (
+    <>
+      <LadderBody
+        state={state}
+        setState={setState}
+        userId={userId}
+        player={player}
+        byId={byId}
+      />
+      {trackId && (
+        <>
+          <div style={{ height: player.status.volume !== null ? 150 : 120 }} />
+          <PlayerBar
+            status={player.status}
+            track={byId.get(trackId)}
+            onToggle={() => player.toggle(trackId)}
+            onSeek={player.seek}
+            onVolume={player.setVolume}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function LadderBody({
+  state,
+  setState,
+  userId,
+  player,
+  byId,
+}: {
+  state: LadderState;
+  setState: (s: LadderState) => void;
+  userId: string;
+  player: Player;
+  byId: Map<string, TrackSummary>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const isSender = state.senderId === userId;
   const isPlayer = state.recipientId === userId;
 
@@ -89,7 +130,12 @@ export default function LadderPlay({ initial, userId }: Props) {
         )}
         {notice}
         <h2>Przebieg drabinki</h2>
-        <Bracket size={state.size} matches={state.matches} tracks={byId} />
+        <Bracket
+          size={state.size}
+          matches={state.matches}
+          tracks={byId}
+          winnerTrackId={state.winnerTrackId}
+        />
       </div>
     );
   }
@@ -110,7 +156,12 @@ export default function LadderPlay({ initial, userId }: Props) {
             <div className="progress">
               <div style={{ width: `${(decided / (state.size - 1)) * 100}%` }} />
             </div>
-            <Bracket size={state.size} matches={state.matches} tracks={byId} />
+            <Bracket
+              size={state.size}
+              matches={state.matches}
+              tracks={byId}
+              current={nextMatch(state.matches)}
+            />
           </>
         )}
       </div>
@@ -233,12 +284,8 @@ export default function LadderPlay({ initial, userId }: Props) {
       <p className="muted small">Dotknij piosenki, żeby ją wybrać. ▶ odtwarza ją (opcjonalnie).</p>
       {error && <p className="error">{error}</p>}
       {notice}
-      {decided > 0 && (
-        <details>
-          <summary className="muted">Pokaż drabinkę</summary>
-          <Bracket size={state.size} matches={state.matches} tracks={byId} />
-        </details>
-      )}
+      <h2>Drabinka</h2>
+      <Bracket size={state.size} matches={state.matches} tracks={byId} current={match} />
     </div>
   );
 }
