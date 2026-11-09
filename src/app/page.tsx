@@ -10,12 +10,23 @@ const STATUS: Record<string, string> = {
   done: "rozstrzygnięta",
 };
 
+function sentStatus(l: SentLadder) {
+  if (l.returned_at) return "✉ wynik odesłany";
+  return l.status === "pending" ? STATUS.pending : "w trakcie";
+}
+
+function receivedStatus(l: SentLadder) {
+  if (l.returned_at) return "odesłana";
+  return l.status === "done" ? "do odesłania" : (STATUS[l.status] ?? l.status);
+}
+
 type SentLadder = {
   share_token: string;
   size: number;
   status: string;
   name?: string | null;
   message: string | null;
+  returned_at?: string | null;
   created_at: string;
 };
 
@@ -110,7 +121,7 @@ export default async function Home({
                       {l.name || l.message || `Drabinka ${l.size} piosenek`}
                     </Link>
                     <span className="muted">
-                      {l.size} · {STATUS[l.status] ?? l.status}
+                      {l.size} · {sentStatus(l)}
                     </span>
                   </li>
                 ))}
@@ -128,7 +139,7 @@ export default async function Home({
                       {l.name || l.message || `Drabinka ${l.size} piosenek`}
                     </Link>
                     <span className="muted">
-                      {l.size} · {STATUS[l.status] ?? l.status}
+                      {l.size} · {receivedStatus(l)}
                     </span>
                   </li>
                 ))}
