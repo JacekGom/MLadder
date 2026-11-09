@@ -93,20 +93,83 @@ function control(action: "seek" | "volume" | "resume", value?: number) {
   }).catch(() => null);
 }
 
+/*
+ * The in-browser player lives for the whole visit, not per page. Creating a
+ * new Spotify player after the previous one was disconnected (moving from
+ * one ladder to another without reloading) often never became ready, so
+ * playback only worked after a refresh.
+ */
+type SdkListener = { onState(s: SdkState | null): void; onReady(): void };
+const sdk: {
+  player: SdkPlayer | null;
+  deviceId: string | null;
+  /** "loading" until Spotify registers this tab as a device. */
+  state: "off" | "loading" | "ready" | "failed";
+  listeners: Set<SdkListener>;
+} = { player: null, deviceId: null, state: "off", listeners: new Set() };
+
+function ensureSdk() {
+  if (sdk.state !== "off") return;
+  sdk.state = "loading";
+
+  const init = () => {
+    if (!window.Spotify || sdk.player) return;
+    const player = new window.Spotify.Player({
+      name: "Drabinka muzyczna",
+      getOAuthToken: (cb) => {
+        fetchToken().then(cb).catch(() => {});
+      },
+      volume: 0.8,
+    });
+    player.addListener("ready", (({ device_id }: { device_id: string }) => {
+      sdk.deviceId = device_id;
+      sdk.state = "ready";
+      sdk.listeners.forEach((l) => l.onReady());
+    }) as (arg: never) => void);
+    player.addListener("not_ready", (() => {
+      sdk.deviceId = null;
+      sdk.state = "loading";
+    }) as (arg: never) => void);
+    player.addListener("player_state_changed", ((s: SdkState | null) =>
+      sdk.listeners.forEach((l) => l.onState(s))) as (arg: never) => void);
+    // Fall back to Spotify Connect if the in-browser player can't start.
+    for (const ev of ["initialization_error", "authentication_error", "account_error"]) {
+      player.addListener(ev, (() => {
+        sdk.deviceId = null;
+        sdk.player = null;
+        sdk.state = "failed";
+      }) as (arg: never) => void);
+    }
+    sdk.player = player;
+    player.connect();
+  };
+
+  if (window.Spotify) {
+    init();
+  } else {
+    window.onSpotifyWebPlaybackSDKReady = init;
+    if (!document.getElementById("spotify-sdk")) {
+      const s = document.createElement("script");
+      s.id = "spotify-sdk";
+      s.src = "https://sdk.scdn.co/spotify-player.js";
+      s.async = true;
+      s.onerror = () => {
+        sdk.state = "failed";
+      };
+      document.body.appendChild(s);
+    }
+  }
+}
+
 export function usePlayer() {
   const [status, setStatus] = useState<PlaybackStatus>(IDLE);
   const [notice, setNotice] = useState<PlayerNotice | null>(null);
-  const playerRef = useRef<SdkPlayer | null>(null);
-  const deviceIdRef = useRef<string | null>(null);
   const requestedRef = useRef<string | null>(null);
-  // Desktop in-browser player: "loading" until Spotify registers this tab
-  // as a device, "failed" if it can't (then we use Spotify Connect).
-  const sdkRef = useRef<"off" | "loading" | "ready" | "failed">("off");
   // Ignore polled positions for a moment after a seek so the slider
   // doesn't jump back.
   const seekLockRef = useRef(0);
 
-  const sdkActive = () => !!playerRef.current && !!deviceIdRef.current;
+  const sdkActive = () => !!sdk.player && !!sdk.deviceId;
 
   const applySdkState = useCallback((s: SdkState | null) => {
     if (!s || !requestedRef.current) return;
@@ -122,62 +185,19 @@ export function usePlayer() {
   // In-browser player (desktop only).
   useEffect(() => {
     if (isMobile()) return;
-    let cancelled = false;
-    sdkRef.current = "loading";
-
-    const init = () => {
-      if (cancelled || !window.Spotify) return;
-      const player = new window.Spotify.Player({
-        name: "Drabinka muzyczna",
-        getOAuthToken: (cb) => {
-          fetchToken().then(cb).catch(() => {});
-        },
-        volume: 0.8,
-      });
-      player.addListener("ready", (({ device_id }: { device_id: string }) => {
-        deviceIdRef.current = device_id;
-        sdkRef.current = "ready";
-        player.getVolume().then((v) =>
-          setStatus((prev) => ({ ...prev, volume: Math.round(v * 100) })),
-        );
-      }) as (arg: never) => void);
-      player.addListener("not_ready", (() => {
-        deviceIdRef.current = null;
-        sdkRef.current = "loading";
-      }) as (arg: never) => void);
-      player.addListener("player_state_changed", ((s: SdkState | null) =>
-        applySdkState(s)) as (arg: never) => void);
-      // Fall back to Spotify Connect if the in-browser player can't start.
-      for (const ev of ["initialization_error", "authentication_error", "account_error"]) {
-        player.addListener(ev, (() => {
-          deviceIdRef.current = null;
-          playerRef.current = null;
-          sdkRef.current = "failed";
-        }) as (arg: never) => void);
-      }
-      player.connect();
-      playerRef.current = player;
-    };
-
-    if (window.Spotify) {
-      init();
-    } else {
-      window.onSpotifyWebPlaybackSDKReady = init;
-      if (!document.getElementById("spotify-sdk")) {
-        const s = document.createElement("script");
-        s.id = "spotify-sdk";
-        s.src = "https://sdk.scdn.co/spotify-player.js";
-        s.async = true;
-        document.body.appendChild(s);
-      }
-    }
-
+    const readVolume = () =>
+      sdk.player
+        ?.getVolume()
+        .then((v) => setStatus((prev) => ({ ...prev, volume: Math.round(v * 100) })))
+        .catch(() => {});
+    const listener: SdkListener = { onState: applySdkState, onReady: readVolume };
+    sdk.listeners.add(listener);
+    ensureSdk();
+    if (sdk.state === "ready") readVolume();
     return () => {
-      cancelled = true;
-      sdkRef.current = "off";
-      playerRef.current?.disconnect();
-      playerRef.current = null;
-      deviceIdRef.current = null;
+      sdk.listeners.delete(listener);
+      // Leaving the page: don't keep playing this ladder's song.
+      if (requestedRef.current && sdkActive()) sdk.player!.pause().catch(() => {});
     };
   }, [applySdkState]);
 
@@ -189,7 +209,7 @@ export function usePlayer() {
     const tick = async () => {
       if (stopped) return;
       if (sdkActive()) {
-        applySdkState(await playerRef.current!.getCurrentState().catch(() => null));
+        applySdkState(await sdk.player!.getCurrentState().catch(() => null));
       } else {
         const res = await fetch("/api/spotify/state", { cache: "no-store" }).catch(() => null);
         const s = res?.ok ? await res.json() : null;
@@ -214,21 +234,21 @@ export function usePlayer() {
 
   /**
    * Spotify accepts a play command even when the phone app is asleep and
-   * then nothing happens. Check a moment later and, if our song isn't
-   * playing, offer to open it in the Spotify app instead.
+   * then nothing happens. If after a few seconds nothing is playing, offer
+   * to open the song in the Spotify app. The player bar stays, so once the
+   * song is started there, the slider follows it. (We don't compare track
+   * ids: Spotify may report a relinked id for the same song.)
    */
   const verifyRemote = useCallback((trackId: string) => {
-    setTimeout(async () => {
+    const check = async (attempt: number) => {
       if (requestedRef.current !== trackId) return;
       const res = await fetch("/api/spotify/state", { cache: "no-store" }).catch(() => null);
       const s = res?.ok ? await res.json() : null;
-      const ok = s?.active && s.isPlaying && (s.trackIds as string[]).includes(trackId);
-      if (!ok && requestedRef.current === trackId) {
-        requestedRef.current = null;
-        setStatus((prev) => ({ ...IDLE, volume: prev.volume }));
-        setNotice({ kind: "open_app", trackId });
-      }
-    }, 4000);
+      if (s?.active && s.isPlaying) return;
+      if (attempt < 2) setTimeout(() => check(attempt + 1), 3000);
+      else if (requestedRef.current === trackId) setNotice({ kind: "open_app", trackId });
+    };
+    setTimeout(() => check(1), 3000);
   }, []);
 
   /**
@@ -239,17 +259,17 @@ export function usePlayer() {
    */
   const waitForSdk = useCallback(async () => {
     const until = Date.now() + 10000;
-    while (sdkRef.current === "loading" && Date.now() < until) {
+    while (sdk.state === "loading" && Date.now() < until) {
       await new Promise((r) => setTimeout(r, 200));
     }
-    return deviceIdRef.current;
+    return sdk.deviceId;
   }, []);
 
   const play = useCallback(async (trackId: string) => {
     setNotice(null);
     // Must run inside the click for browsers' autoplay rules.
-    await playerRef.current?.activateElement().catch(() => {});
-    const desktop = sdkRef.current !== "off" && sdkRef.current !== "failed";
+    await sdk.player?.activateElement().catch(() => {});
+    const desktop = sdk.state !== "off" && sdk.state !== "failed";
     const deviceId = desktop ? await waitForSdk() : null;
     if (desktop && !deviceId) {
       setNotice({ kind: "browser_player" });
@@ -275,21 +295,27 @@ export function usePlayer() {
       return;
     }
     const { error, detail } = await res.json().catch(() => ({ error: "error" }));
-    if (error === "no_device")
-      setNotice(deviceId ? { kind: "browser_player" } : { kind: "open_app", trackId });
+    if (error === "no_device" && deviceId) setNotice({ kind: "browser_player" });
+    else if (error === "no_device") {
+      // Phone: keep the player bar so that once the song is opened in the
+      // Spotify app (link in the notice), the slider follows it.
+      requestedRef.current = trackId;
+      setStatus((prev) => ({ ...prev, trackId, paused: true, positionMs: 0 }));
+      setNotice({ kind: "open_app", trackId });
+    }
     else if (error === "premium_required") setNotice({ kind: "premium" });
     else setNotice({ kind: "error", detail });
   }, [verifyRemote, waitForSdk]);
 
   const pause = useCallback(async () => {
     setStatus((prev) => ({ ...prev, paused: true }));
-    if (sdkActive()) await playerRef.current!.pause().catch(() => {});
+    if (sdkActive()) await sdk.player!.pause().catch(() => {});
     else await fetch("/api/spotify/pause", { method: "POST" }).catch(() => {});
   }, []);
 
   const resume = useCallback(async () => {
     setStatus((prev) => ({ ...prev, paused: false }));
-    if (sdkActive()) await playerRef.current!.resume().catch(() => {});
+    if (sdkActive()) await sdk.player!.resume().catch(() => {});
     else await control("resume");
   }, []);
 
@@ -304,7 +330,7 @@ export function usePlayer() {
   const seek = useCallback(async (ms: number) => {
     seekLockRef.current = Date.now() + 1500;
     setStatus((prev) => ({ ...prev, positionMs: ms }));
-    if (sdkActive()) await playerRef.current!.seek(ms).catch(() => {});
+    if (sdkActive()) await sdk.player!.seek(ms).catch(() => {});
     else await control("seek", ms);
   }, []);
 
@@ -313,13 +339,13 @@ export function usePlayer() {
     if (!requestedRef.current) return;
     requestedRef.current = null;
     setStatus((prev) => ({ ...IDLE, volume: prev.volume }));
-    if (sdkActive()) await playerRef.current!.pause().catch(() => {});
+    if (sdkActive()) await sdk.player!.pause().catch(() => {});
     else await fetch("/api/spotify/pause", { method: "POST" }).catch(() => {});
   }, []);
 
   const setVolume = useCallback(async (percent: number) => {
     setStatus((prev) => ({ ...prev, volume: percent }));
-    if (sdkActive()) await playerRef.current!.setVolume(percent / 100).catch(() => {});
+    if (sdkActive()) await sdk.player!.setVolume(percent / 100).catch(() => {});
     else await control("volume", percent);
   }, []);
 
