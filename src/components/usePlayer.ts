@@ -54,7 +54,7 @@ declare global {
 export type PlayerNotice =
   | { kind: "open_app"; trackId: string }
   | { kind: "premium" }
-  | { kind: "error" };
+  | { kind: "error"; detail?: string };
 
 export type PlaybackStatus = {
   /** The song we asked Spotify to play (stays set while paused). */
@@ -203,6 +203,25 @@ export function usePlayer() {
     };
   }, [active, applySdkState]);
 
+  /**
+   * Spotify accepts a play command even when the phone app is asleep and
+   * then nothing happens. Check a moment later and, if our song isn't
+   * playing, offer to open it in the Spotify app instead.
+   */
+  const verifyRemote = useCallback((trackId: string) => {
+    setTimeout(async () => {
+      if (requestedRef.current !== trackId) return;
+      const res = await fetch("/api/spotify/state", { cache: "no-store" }).catch(() => null);
+      const s = res?.ok ? await res.json() : null;
+      const ok = s?.active && s.isPlaying && (s.trackIds as string[]).includes(trackId);
+      if (!ok && requestedRef.current === trackId) {
+        requestedRef.current = null;
+        setStatus((prev) => ({ ...IDLE, volume: prev.volume }));
+        setNotice({ kind: "open_app", trackId });
+      }
+    }, 4000);
+  }, []);
+
   const play = useCallback(async (trackId: string) => {
     setNotice(null);
     // Must run inside the click for browsers' autoplay rules.
@@ -215,13 +234,14 @@ export function usePlayer() {
     if (res.ok) {
       requestedRef.current = trackId;
       setStatus((prev) => ({ ...prev, trackId, paused: false, positionMs: 0 }));
+      if (!sdkActive()) verifyRemote(trackId);
       return;
     }
-    const { error } = await res.json().catch(() => ({ error: "error" }));
+    const { error, detail } = await res.json().catch(() => ({ error: "error" }));
     if (error === "no_device") setNotice({ kind: "open_app", trackId });
     else if (error === "premium_required") setNotice({ kind: "premium" });
-    else setNotice({ kind: "error" });
-  }, []);
+    else setNotice({ kind: "error", detail });
+  }, [verifyRemote]);
 
   const pause = useCallback(async () => {
     setStatus((prev) => ({ ...prev, paused: true }));

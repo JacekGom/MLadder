@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CopyLink from "@/components/CopyLink";
 import { useEffect, useMemo, useState } from "react";
 import { LADDER_SIZES, type LadderSize, type TrackSummary } from "@/lib/tracks";
 
@@ -18,7 +19,6 @@ export default function LadderBuilder({ top, topError }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const selectedIds = useMemo(() => new Set(selected.map((t) => t.id)), [selected]);
   const full = selected.length >= size;
@@ -109,29 +109,16 @@ export default function LadderBuilder({ top, topError }: Props) {
     }
   }
 
-  async function share() {
-    if (!shareUrl) return;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: name || "Drabinka muzyczna", text: message || undefined, url: shareUrl });
-        return;
-      } catch {
-        // User cancelled or share failed; fall back to copying.
-      }
-    }
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-  }
-
   if (shareUrl) {
     return (
       <section className="stack">
         <p>Gotowe! Wyślij ten link osobie, która ma rozstrzygnąć drabinkę:</p>
         <input className="input" readOnly value={shareUrl} onFocus={(e) => e.target.select()} />
-        <div className="row">
-          <button className="button" onClick={share}>
-            {copied ? "Skopiowano ✓" : "Udostępnij link"}
-          </button>
+        <CopyLink url={shareUrl} text={message.trim() || null} title={name || undefined} />
+        {message.trim() && (
+          <p className="muted small">„Kopiuj link” skopiuje też Twoją wiadomość.</p>
+        )}
+        <div>
           <Link className="button secondary" href="/">
             Strona główna
           </Link>

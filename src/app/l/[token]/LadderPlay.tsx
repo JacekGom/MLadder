@@ -230,8 +230,8 @@ function LadderBody({
             <p className="muted">
               Wyślij link do tej strony osobie, która ma rozstrzygnąć drabinkę.
             </p>
+            <CopyLink text={state.message} title={state.name ?? undefined} />
             <div className="row">
-              <CopyLink />
               <SendCopyButton token={state.token} />
               <button
                 className="button secondary"
@@ -404,7 +404,7 @@ function ReturnBox({
           link do tej strony:
         </div>
         <div>
-          <CopyLink label="Udostępnij link" />
+          <CopyLink />
         </div>
       </div>
     );
@@ -475,19 +475,26 @@ function Notice({ notice, onClose }: { notice: PlayerNotice; onClose: () => void
     <div className="notice">
       {notice.kind === "open_app" && (
         <span>
-          Nie widzę aktywnego odtwarzacza Spotify.{" "}
+          Spotify nie zaczął grać (aplikacja Spotify jest pewnie uśpiona).{" "}
+          <a href={`spotify:track:${notice.trackId}`}>Otwórz piosenkę w aplikacji Spotify</a>
+          {" "}(lub{" "}
           <a
             href={`https://open.spotify.com/track/${notice.trackId}`}
             target="_blank"
             rel="noreferrer"
           >
-            Otwórz piosenkę w Spotify
+            w przeglądarce
           </a>
-          , a kolejne będą już grały w aplikacji.
+          ), wróć tutaj, a kolejne piosenki będą już grały z poziomu drabinki.
         </span>
       )}
       {notice.kind === "premium" && <span>Odtwarzanie wymaga Spotify Premium.</span>}
-      {notice.kind === "error" && <span>Nie udało się odtworzyć piosenki.</span>}
+      {notice.kind === "error" && (
+        <span>
+          Nie udało się odtworzyć piosenki.
+          {notice.detail && <span className="muted small"> ({notice.detail})</span>}
+        </span>
+      )}
       <button className="notice-close" onClick={onClose} aria-label="Zamknij">
         ×
       </button>
