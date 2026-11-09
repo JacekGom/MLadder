@@ -25,7 +25,9 @@ function sessionOptions(): SessionOptions {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 30,
+      // A year; the cookie is re-saved on every token refresh, so active
+      // users stay logged in and never see the Spotify login again.
+      maxAge: 60 * 60 * 24 * 365,
     },
   };
 }
