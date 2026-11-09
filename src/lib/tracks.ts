@@ -18,8 +18,9 @@ export type SpotifyTrack = {
 
 export function toSummary(t: SpotifyTrack): TrackSummary {
   const images = t.album?.images ?? [];
-  // Spotify lists images largest first; prefer a small one for lists.
-  const image = images[images.length - 1]?.url ?? images[0]?.url ?? null;
+  // Spotify lists images largest first (640, 300, 64); 300px looks sharp
+  // in both lists and duel cards.
+  const image = images[1]?.url ?? images[0]?.url ?? null;
   return {
     id: t.id,
     name: t.name,

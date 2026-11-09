@@ -122,4 +122,21 @@ export async function spotifyGet<T>(path: string, token: string): Promise<T> {
   return res.json();
 }
 
+/** Raw call for endpoints that return no body (player control). */
+export function spotifyFetch(
+  path: string,
+  token: string,
+  init: { method: string; body?: unknown },
+) {
+  return fetch(`${API}${path}`, {
+    method: init.method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    cache: "no-store",
+  });
+}
+
 export const getMe = (token: string) => spotifyGet<SpotifyUser>("/me", token);
