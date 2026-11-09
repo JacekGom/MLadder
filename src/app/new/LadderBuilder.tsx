@@ -13,6 +13,7 @@ export default function LadderBuilder({ top, topError }: Props) {
   const [results, setResults] = useState<TrackSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -82,7 +83,7 @@ export default function LadderBuilder({ top, topError }: Props) {
       const res = await fetch("/api/ladders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tracks: selected, message }),
+        body: JSON.stringify({ tracks: selected, name, message }),
       });
       if (res.status === 401) {
         window.location.href = "/api/auth/login?next=/new";
@@ -112,7 +113,7 @@ export default function LadderBuilder({ top, topError }: Props) {
     if (!shareUrl) return;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Drabinka muzyczna", text: message || undefined, url: shareUrl });
+        await navigator.share({ title: name || "Drabinka muzyczna", text: message || undefined, url: shareUrl });
         return;
       } catch {
         // User cancelled or share failed; fall back to copying.
@@ -161,6 +162,27 @@ export default function LadderBuilder({ top, topError }: Props) {
         </div>
       </div>
 
+      <label className="stack-sm">
+        <span className="label">Nazwa drabinki (opcjonalnie)</span>
+        <input
+          className="input"
+          maxLength={80}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="np. Jesienne hity"
+        />
+      </label>
+      <label className="stack-sm">
+        <span className="label">Wiadomość dla odbiorcy (opcjonalnie)</span>
+        <input
+          className="input"
+          maxLength={280}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="np. Która najlepsza na jesień?"
+        />
+      </label>
+
       <div className="sticky-bar">
         <span>
           Wybrano <strong>{selected.length}</strong> z {size}
@@ -170,19 +192,6 @@ export default function LadderBuilder({ top, topError }: Props) {
         </button>
       </div>
       {submitError && <p className="error">{submitError}</p>}
-
-      {full && (
-        <label className="stack-sm">
-          <span className="label">Wiadomość dla odbiorcy (opcjonalnie)</span>
-          <input
-            className="input"
-            maxLength={280}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="np. Która najlepsza na jesień?"
-          />
-        </label>
-      )}
 
       {selected.length > 0 && (
         <details>

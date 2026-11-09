@@ -649,3 +649,7 @@ a {
 main.has-player {
   padding-bottom: 180px;
 }
+
+blockquote {
+  margin: 0;
+}

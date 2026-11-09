@@ -11,7 +11,7 @@ function dbError(where: string, err: { message?: string; code?: string } | null)
   return NextResponse.json({ error: "db_error", detail: `${where}: ${detail}` }, { status: 500 });
 }
 
-type Body = { tracks?: unknown; message?: unknown };
+type Body = { tracks?: unknown; name?: unknown; message?: unknown };
 
 function str(v: unknown, max: number): string | null {
   return typeof v === "string" && v.length > 0 && v.length <= max ? v : null;
@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
   if (!tracks || !(LADDER_SIZES as readonly number[]).includes(tracks.length)) {
     return NextResponse.json({ error: "bad_tracks" }, { status: 400 });
   }
+  const name =
+    typeof body.name === "string" ? body.name.trim().slice(0, 80) || null : null;
   const message =
     typeof body.message === "string" ? body.message.trim().slice(0, 280) || null : null;
 
@@ -69,7 +71,9 @@ export async function POST(req: NextRequest) {
 
   const { data: ladder, error } = await db
     .from("ladders")
-    .insert({ sender_id: auth.userId, size: tracks.length, message })
+    // Only send `name` when set, so ladders without one still save before
+    // migration 0004 is run.
+    .insert({ sender_id: auth.userId, size: tracks.length, message, ...(name ? { name } : {}) })
     .select("id, share_token")
     .single();
   if (error || !ladder) return dbError("ladder insert failed", error);
