@@ -17,7 +17,8 @@ hosting Vercel.
    - w *User Management* dodaj e-maile kont Spotify, które mają móc się
      logować (w trybie deweloperskim tylko one mają dostęp).
 2. **Supabase.** Załóż projekt na [supabase.com](https://supabase.com), otwórz
-   *SQL Editor* i uruchom zawartość `supabase/migrations/0001_init.sql`.
+   *SQL Editor* i uruchom po kolei zawartość plików z `supabase/migrations/`
+   (`0001_init.sql`, potem `0002_ladder_functions.sql`).
    Adres i klucz *service_role* znajdziesz w *Project Settings → API*.
    (Bez Supabase logowanie też zadziała, tylko nic nie zostanie zapisane.)
 3. **Zmienne.** Skopiuj `.env.example` do `.env.local` i uzupełnij.
@@ -40,6 +41,6 @@ hosting Vercel.
 1. Szkielet i logowanie przez Spotify ✅
 2. Wysyłanie zestawu ✅ (top 50 z ostatniego miesiąca + wyszukiwarka, wybór 2^n
    piosenek, link dla odbiorcy)
-3. Wypełnianie drabinki (losowe rozstawienie, pojedynki, opcjonalne
+3. Wypełnianie drabinki ✅ (losowe rozstawienie, pojedynki, opcjonalne
    odtwarzanie)
 4. Wynik dla nadawcy i dopracowanie widoku na telefonie

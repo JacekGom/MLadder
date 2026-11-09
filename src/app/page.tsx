@@ -45,6 +45,7 @@ export default async function Home({
   }
 
   let sent: SentLadder[] = [];
+  let received: SentLadder[] = [];
   const db = supabaseAdmin();
   if (me && db) {
     const { data } = await db
@@ -54,6 +55,14 @@ export default async function Home({
       .order("created_at", { ascending: false })
       .limit(20);
     sent = data ?? [];
+    const { data: rec } = await db
+      .from("ladders")
+      .select("share_token, size, status, message, created_at")
+      .eq("recipient_id", me.id)
+      .neq("sender_id", me.id)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    received = rec ?? [];
   }
 
   return (
@@ -95,6 +104,24 @@ export default async function Home({
               <h2>Wysłane</h2>
               <ul className="ladder-list">
                 {sent.map((l) => (
+                  <li key={l.share_token}>
+                    <Link href={`/l/${l.share_token}`}>
+                      {l.message || `Drabinka ${l.size} piosenek`}
+                    </Link>
+                    <span className="muted">
+                      {l.size} · {STATUS[l.status] ?? l.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {received.length > 0 && (
+            <section style={{ marginTop: 24 }}>
+              <h2>Otrzymane</h2>
+              <ul className="ladder-list">
+                {received.map((l) => (
                   <li key={l.share_token}>
                     <Link href={`/l/${l.share_token}`}>
                       {l.message || `Drabinka ${l.size} piosenek`}
