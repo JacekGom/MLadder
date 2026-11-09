@@ -250,6 +250,15 @@ export function usePlayer() {
     else await control("seek", ms);
   }, []);
 
+  /** Stops playback and hides the player (used whenever the view changes). */
+  const stop = useCallback(async () => {
+    if (!requestedRef.current) return;
+    requestedRef.current = null;
+    setStatus((prev) => ({ ...IDLE, volume: prev.volume }));
+    if (sdkActive()) await playerRef.current!.pause().catch(() => {});
+    else await fetch("/api/spotify/pause", { method: "POST" }).catch(() => {});
+  }, []);
+
   const setVolume = useCallback(async (percent: number) => {
     setStatus((prev) => ({ ...prev, volume: percent }));
     if (sdkActive()) await playerRef.current!.setVolume(percent / 100).catch(() => {});
@@ -264,6 +273,7 @@ export function usePlayer() {
     dismissNotice: () => setNotice(null),
     toggle,
     pause,
+    stop,
     seek,
     setVolume,
   };

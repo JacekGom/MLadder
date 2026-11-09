@@ -324,7 +324,7 @@ li.track {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 12px 64px;
+  padding: 12px;
   border: 2px solid transparent;
   border-radius: 12px;
   background: transparent;
@@ -356,10 +356,25 @@ li.track {
   -webkit-box-orient: vertical;
 }
 
-.duel-card .play {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
+.duel-card {
+  gap: 0;
+}
+
+/* Full-width play bar under the card, clearly separate from "pick". */
+.play-wide {
+  height: 48px;
+  margin: 0 12px 12px;
+  border: none;
+  border-radius: 999px;
+  background: #2e2e2e;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.play-wide:active {
+  background: #3a3a3a;
 }
 
 .vs {
