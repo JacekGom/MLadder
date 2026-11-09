@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import CopyLink from "@/components/CopyLink";
+import Bracket from "./Bracket";
 import { usePlayer, type PlayerNotice } from "@/components/usePlayer";
 import { nextMatch, roundCount, roundName, type LadderState } from "@/lib/ladder";
 import type { TrackSummary } from "@/lib/tracks";
@@ -87,6 +88,8 @@ export default function LadderPlay({ initial, userId }: Props) {
           </div>
         )}
         {notice}
+        <h2>Przebieg drabinki</h2>
+        <Bracket size={state.size} matches={state.matches} tracks={byId} />
       </div>
     );
   }
@@ -102,6 +105,14 @@ export default function LadderPlay({ initial, userId }: Props) {
             ? `${state.recipientName ?? "Odbiorca"} rozgrywa drabinkę: ${decided} z ${state.size - 1} pojedynków.`
             : "Tę drabinkę rozgrywa już ktoś inny."}
         </p>
+        {isSender && (
+          <>
+            <div className="progress">
+              <div style={{ width: `${(decided / (state.size - 1)) * 100}%` }} />
+            </div>
+            <Bracket size={state.size} matches={state.matches} tracks={byId} />
+          </>
+        )}
       </div>
     );
   }
@@ -222,6 +233,12 @@ export default function LadderPlay({ initial, userId }: Props) {
       <p className="muted small">Dotknij piosenki, żeby ją wybrać. ▶ odtwarza ją (opcjonalnie).</p>
       {error && <p className="error">{error}</p>}
       {notice}
+      {decided > 0 && (
+        <details>
+          <summary className="muted">Pokaż drabinkę</summary>
+          <Bracket size={state.size} matches={state.matches} tracks={byId} />
+        </details>
+      )}
     </div>
   );
 }
