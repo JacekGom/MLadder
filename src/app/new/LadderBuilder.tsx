@@ -89,14 +89,20 @@ export default function LadderBuilder({ top, topError }: Props) {
         window.location.href = "/api/auth/login?next=/new";
         return;
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? String(res.status));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.error ?? String(res.status));
+        (err as Error & { detail?: string }).detail = data.detail;
+        throw err;
+      }
       setShareUrl(`${window.location.origin}/l/${data.token}`);
     } catch (e) {
       setSubmitError(
         (e as Error).message === "db_not_configured"
           ? "Baza danych nie jest skonfigurowana (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)."
-          : "Nie udało się zapisać drabinki. Spróbuj ponownie.",
+          : `Nie udało się zapisać drabinki. ${
+              (e as Error & { detail?: string }).detail ?? (e as Error).message
+            }`,
       );
     } finally {
       setSubmitting(false);
