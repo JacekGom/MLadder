@@ -4,6 +4,7 @@ import { redirectTo } from "@/lib/redirect";
 import { getSession } from "@/lib/session";
 import { applyTokens, exchangeCode, getMe } from "@/lib/spotify";
 import { supabaseAdmin } from "@/lib/supabase";
+import { readState } from "@/lib/oauthState";
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
@@ -12,12 +13,16 @@ export async function GET(req: NextRequest) {
   const error = url.searchParams.get("error");
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const expectedState = session.oauthState;
-  const next = safeNext(session.loginNext);
+  // Same browser: the state must match the cookie. Another browser (phone
+  // login finished via the Spotify app): the signed state is enough.
+  const signed = state ? readState(state) : null;
+  const stateOk =
+    !!signed && (!session.oauthState || state === session.oauthState);
+  const next = safeNext(signed?.next ?? session.loginNext);
   session.oauthState = undefined;
   session.loginNext = undefined;
 
-  if (error || !code || !state || state !== expectedState) {
+  if (error || !code || !stateOk) {
     await session.save();
     const reason = error === "access_denied" ? error : "login_failed";
     return redirectTo(`/?error=${reason}`);
