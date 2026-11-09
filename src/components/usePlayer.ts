@@ -165,6 +165,10 @@ export function usePlayer() {
   const [status, setStatus] = useState<PlaybackStatus>(IDLE);
   const [notice, setNotice] = useState<PlayerNotice | null>(null);
   const requestedRef = useRef<string | null>(null);
+  // Phones: is the Spotify app currently playing something? Only then can
+  // we switch songs remotely; a paused iPhone app goes to sleep within
+  // seconds and ignores play commands.
+  const remoteActiveRef = useRef(false);
   // Ignore polled positions for a moment after a seek so the slider
   // doesn't jump back.
   const seekLockRef = useRef(0);
@@ -201,6 +205,25 @@ export function usePlayer() {
     };
   }, [applySdkState]);
 
+  // Phones: keep track of whether the Spotify app is playing, also while
+  // our player bar is hidden and right after returning from the app.
+  useEffect(() => {
+    if (!isMobile()) return;
+    const check = async () => {
+      if (document.visibilityState !== "visible") return;
+      const res = await fetch("/api/spotify/state", { cache: "no-store" }).catch(() => null);
+      const s = res?.ok ? await res.json() : null;
+      remoteActiveRef.current = !!(s?.active && s.isPlaying);
+    };
+    check();
+    const id = setInterval(check, 5000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, []);
+
   // Keep the time slider moving while something is playing.
   const active = status.trackId !== null;
   useEffect(() => {
@@ -213,6 +236,7 @@ export function usePlayer() {
       } else {
         const res = await fetch("/api/spotify/state", { cache: "no-store" }).catch(() => null);
         const s = res?.ok ? await res.json() : null;
+        if (res?.ok) remoteActiveRef.current = !!(s?.active && s.isPlaying);
         if (s?.active && !stopped) {
           setStatus((prev) => ({
             ...prev,
@@ -267,6 +291,17 @@ export function usePlayer() {
 
   const play = useCallback(async (trackId: string) => {
     setNotice(null);
+    if (isMobile() && !remoteActiveRef.current) {
+      // Nothing is playing in the Spotify app, so a remote command would
+      // most likely be ignored. Open the song in the app instead; this has
+      // to happen right in the tap, before any await. The player bar stays
+      // and follows the song once the app plays it.
+      requestedRef.current = trackId;
+      remoteActiveRef.current = true;
+      setStatus((prev) => ({ ...prev, trackId, paused: false, positionMs: 0 }));
+      window.location.href = `spotify:track:${trackId}`;
+      return;
+    }
     // Must run inside the click for browsers' autoplay rules.
     await sdk.player?.activateElement().catch(() => {});
     const desktop = sdk.state !== "off" && sdk.state !== "failed";
