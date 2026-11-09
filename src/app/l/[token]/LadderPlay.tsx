@@ -120,7 +120,7 @@ function LadderBody({
   );
 
   // --- Finished ---------------------------------------------------------
-  if (state.status === "done" && state.winnerTrackId) {
+  if (state.status === "done" && state.winnerTrackId && (isPlayer || state.returnedAt)) {
     const winner = byId.get(state.winnerTrackId);
     return (
       <div className="stack">
@@ -145,6 +145,22 @@ function LadderBody({
             />
           </div>
         )}
+        {isSender && !isPlayer && state.replyMessage && (
+          <blockquote className="card">
+            „{state.replyMessage}”
+            <div className="muted small">— {state.recipientName ?? "odbiorca"}</div>
+          </blockquote>
+        )}
+        {isPlayer && !isSender && (
+          <ReturnBox
+            key={state.returnedAt ?? "new"}
+            senderName={state.senderName}
+            returnedAt={state.returnedAt}
+            replyMessage={state.replyMessage}
+            busy={busy}
+            onSend={(message) => post("return", { message })}
+          />
+        )}
         {isPlayer && (
           <div>
             <button
@@ -163,6 +179,7 @@ function LadderBody({
             </button>
           </div>
         )}
+        {isSender && <SendCopyButton token={state.token} />}
         {error && <p className="error">{error}</p>}
         {notice}
         <h2>Przebieg drabinki</h2>
@@ -177,27 +194,26 @@ function LadderBody({
   }
 
   // --- Someone else is playing / will play ------------------------------
+  // The sender sees the result only once the player sends it back.
   if (state.status !== "pending" && !isPlayer) {
     const decided = state.matches.filter((m) => m.winner).length;
+    const who = state.recipientName ?? "Odbiorca";
     return (
       <div className="stack">
         {header}
         <p className="muted">
-          {isSender
-            ? `${state.recipientName ?? "Odbiorca"} rozgrywa drabinkę: ${decided} z ${state.size - 1} pojedynków.`
-            : "Tę drabinkę rozgrywa już ktoś inny."}
+          {!isSender
+            ? "Tę drabinkę rozgrywa już ktoś inny."
+            : state.status === "done"
+              ? `${who} skończył(a) drabinkę, ale jeszcze nie odesłał(a) wyniku.`
+              : `${who} rozgrywa drabinkę: ${decided} z ${state.size - 1} pojedynków. Wynik zobaczysz, gdy ${who} go odeśle.`}
         </p>
         {isSender && (
           <>
             <div className="progress">
               <div style={{ width: `${(decided / (state.size - 1)) * 100}%` }} />
             </div>
-            <Bracket
-              size={state.size}
-              matches={state.matches}
-              tracks={byId}
-              current={nextMatch(state.matches)}
-            />
+            <SendCopyButton token={state.token} />
           </>
         )}
       </div>
@@ -216,6 +232,7 @@ function LadderBody({
             </p>
             <div className="row">
               <CopyLink />
+              <SendCopyButton token={state.token} />
               <button
                 className="button secondary"
                 disabled={busy}
@@ -333,6 +350,83 @@ function LadderBody({
       {notice}
       <h2>Drabinka</h2>
       <Bracket size={state.size} matches={state.matches} tracks={byId} current={match} />
+    </div>
+  );
+}
+
+function SendCopyButton({ token }: { token: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  async function copy() {
+    setBusy(true);
+    setError(false);
+    try {
+      const res = await fetch(`/api/ladders/${token}/copy`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      window.location.href = `/l/${data.token}`;
+    } catch {
+      setError(true);
+      setBusy(false);
+    }
+  }
+  return (
+    <div>
+      <button className="button secondary" disabled={busy} onClick={copy}>
+        {busy ? "Tworzę kopię…" : "➕ Wyślij te piosenki komuś innemu"}
+      </button>
+      {error && <p className="error">Nie udało się utworzyć kopii.</p>}
+    </div>
+  );
+}
+
+function ReturnBox({
+  senderName,
+  returnedAt,
+  replyMessage,
+  busy,
+  onSend,
+}: {
+  senderName: string;
+  returnedAt: string | null;
+  replyMessage: string | null;
+  busy: boolean;
+  onSend: (message: string) => void;
+}) {
+  const [message, setMessage] = useState(replyMessage ?? "");
+  if (returnedAt) {
+    return (
+      <div className="card stack-sm" style={{ display: "flex", alignItems: "stretch" }}>
+        <div>✉ Wynik odesłany!</div>
+        {replyMessage && <div className="muted">„{replyMessage}”</div>}
+        <div className="muted small">
+          {senderName} zobaczy go na swojej liście drabinek. Możesz też wysłać
+          link do tej strony:
+        </div>
+        <div>
+          <CopyLink label="Udostępnij link" />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="card stack-sm" style={{ display: "flex", alignItems: "stretch" }}>
+      <label className="stack-sm">
+        <span className="label">Wiadomość dla nadawcy: {senderName} (opcjonalnie)</span>
+        <textarea
+          className="input"
+          rows={2}
+          maxLength={280}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="np. Trudny finał!"
+        />
+      </label>
+      <div>
+        <button className="button" disabled={busy} onClick={() => onSend(message)}>
+          ✉ Odeślij wynik
+        </button>
+      </div>
     </div>
   );
 }

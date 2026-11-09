@@ -21,6 +21,9 @@ export type LadderState = {
   recipientId: string | null;
   recipientName: string | null;
   winnerTrackId: string | null;
+  /** Set when the player sent the result back to the sender. */
+  returnedAt: string | null;
+  replyMessage: string | null;
   tracks: TrackSummary[];
   matches: Match[];
 };
@@ -58,6 +61,8 @@ type Row = {
   sender_id: string;
   recipient_id: string | null;
   winner_track_id: string | null;
+  returned_at?: string | null;
+  reply_message?: string | null;
   sender: { display_name: string | null } | null;
   recipient: { display_name: string | null } | null;
 };
@@ -110,6 +115,8 @@ export async function loadLadder(
       ? (l.recipient.display_name ?? l.recipient_id)
       : null,
     winnerTrackId: l.winner_track_id,
+    returnedAt: l.returned_at ?? null,
+    replyMessage: l.reply_message ?? null,
     tracks: tracksRes.data.map((t) => ({
       id: t.spotify_track_id,
       name: t.name,
