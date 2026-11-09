@@ -230,6 +230,13 @@ function LadderBody({
             <p className="muted">
               Wyślij link do tej strony osobie, która ma rozstrzygnąć drabinkę.
             </p>
+            <EditTextBox
+              key={`${state.name ?? ""}|${state.message ?? ""}`}
+              name={state.name}
+              message={state.message}
+              busy={busy}
+              onSave={(name, message) => post("edit", { name, message })}
+            />
             <CopyLink text={state.message} title={state.name ?? undefined} />
             <div className="row">
               <SendCopyButton token={state.token} />
@@ -350,6 +357,52 @@ function LadderBody({
       {notice}
       <h2>Drabinka</h2>
       <Bracket size={state.size} matches={state.matches} tracks={byId} current={match} />
+    </div>
+  );
+}
+
+/** Sender edits the name and message before sending (pending only). */
+function EditTextBox({
+  name,
+  message,
+  busy,
+  onSave,
+}: {
+  name: string | null;
+  message: string | null;
+  busy: boolean;
+  onSave: (name: string, message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [n, setN] = useState(name ?? "");
+  const [m, setM] = useState(message ?? "");
+  if (!open) {
+    return (
+      <div>
+        <button className="button secondary" onClick={() => setOpen(true)}>
+          ✎ Zmień nazwę lub wiadomość
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="card stack" style={{ alignItems: "stretch" }}>
+      <label className="stack-sm">
+        <span className="label">Nazwa drabinki (opcjonalnie)</span>
+        <input className="input" maxLength={80} value={n} onChange={(e) => setN(e.target.value)} />
+      </label>
+      <label className="stack-sm">
+        <span className="label">Wiadomość dla odbiorcy (opcjonalnie)</span>
+        <input className="input" maxLength={280} value={m} onChange={(e) => setM(e.target.value)} />
+      </label>
+      <div className="row">
+        <button className="button" disabled={busy} onClick={() => onSave(n, m)}>
+          {busy ? "Zapisuję…" : "Zapisz"}
+        </button>
+        <button className="button secondary" disabled={busy} onClick={() => setOpen(false)}>
+          Anuluj
+        </button>
+      </div>
     </div>
   );
 }
