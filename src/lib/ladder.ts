@@ -14,6 +14,7 @@ export type LadderState = {
   token: string;
   size: number;
   status: "pending" | "in_progress" | "done";
+  name: string | null;
   message: string | null;
   senderId: string;
   senderName: string;
@@ -52,6 +53,7 @@ type Row = {
   share_token: string;
   size: number;
   status: LadderState["status"];
+  name?: string | null;
   message: string | null;
   sender_id: string;
   recipient_id: string | null;
@@ -67,7 +69,8 @@ export async function loadLadder(
   const { data: l, error } = await db
     .from("ladders")
     .select(
-      "id, share_token, size, status, message, sender_id, recipient_id, winner_track_id, " +
+      // "*" so this keeps working before migration 0004 adds `name`.
+      "*, " +
         "sender:users!ladders_sender_id_fkey(display_name), " +
         "recipient:users!ladders_recipient_id_fkey(display_name)",
     )
@@ -98,6 +101,7 @@ export async function loadLadder(
     token: l.share_token,
     size: l.size,
     status: l.status,
+    name: l.name ?? null,
     message: l.message,
     senderId: l.sender_id,
     senderName: l.sender?.display_name ?? l.sender_id,

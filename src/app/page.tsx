@@ -14,6 +14,7 @@ type SentLadder = {
   share_token: string;
   size: number;
   status: string;
+  name?: string | null;
   message: string | null;
   created_at: string;
 };
@@ -50,14 +51,14 @@ export default async function Home({
   if (me && db) {
     const { data } = await db
       .from("ladders")
-      .select("share_token, size, status, message, created_at")
+      .select("*")
       .eq("sender_id", me.id)
       .order("created_at", { ascending: false })
       .limit(20);
     sent = data ?? [];
     const { data: rec } = await db
       .from("ladders")
-      .select("share_token, size, status, message, created_at")
+      .select("*")
       .eq("recipient_id", me.id)
       .neq("sender_id", me.id)
       .order("created_at", { ascending: false })
@@ -106,7 +107,7 @@ export default async function Home({
                 {sent.map((l) => (
                   <li key={l.share_token}>
                     <Link href={`/l/${l.share_token}`}>
-                      {l.message || `Drabinka ${l.size} piosenek`}
+                      {l.name || l.message || `Drabinka ${l.size} piosenek`}
                     </Link>
                     <span className="muted">
                       {l.size} · {STATUS[l.status] ?? l.status}
@@ -124,7 +125,7 @@ export default async function Home({
                 {received.map((l) => (
                   <li key={l.share_token}>
                     <Link href={`/l/${l.share_token}`}>
-                      {l.message || `Drabinka ${l.size} piosenek`}
+                      {l.name || l.message || `Drabinka ${l.size} piosenek`}
                     </Link>
                     <span className="muted">
                       {l.size} · {STATUS[l.status] ?? l.status}

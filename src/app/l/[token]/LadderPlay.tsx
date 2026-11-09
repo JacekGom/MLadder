@@ -106,10 +106,11 @@ function LadderBody({
 
   const header = (
     <>
-      <h1>
-        {isSender ? "Twoja drabinka" : `Drabinka od ${state.senderName}`} ·{" "}
+      <h1>{state.name || (isSender ? "Twoja drabinka" : `Drabinka od ${state.senderName}`)}</h1>
+      <p className="muted" style={{ margin: 0 }}>
+        {state.name && (isSender ? "Twoja drabinka · " : `Od ${state.senderName} · `)}
         {state.size} piosenek
-      </h1>
+      </p>
       {state.message && <blockquote className="card">„{state.message}”</blockquote>}
     </>
   );
@@ -146,8 +147,19 @@ function LadderBody({
         )}
         {isPlayer && (
           <div>
-            <button className="button secondary" disabled={busy} onClick={() => post("undo")}>
-              ↶ Cofnij ostatni wybór
+            <button
+              className="button secondary"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Rozegrać drabinkę od nowa? Obecny wynik zostanie zastąpiony nowym losowaniem.",
+                  )
+                )
+                  post("restart");
+              }}
+            >
+              ↻ Rozegraj ponownie
             </button>
           </div>
         )}
