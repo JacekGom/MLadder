@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { safeNext } from "@/lib/auth";
 import { redirectTo } from "@/lib/redirect";
 import { getSession } from "@/lib/session";
 import { applyTokens, exchangeCode, getMe } from "@/lib/spotify";
@@ -12,7 +13,9 @@ export async function GET(req: NextRequest) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const expectedState = session.oauthState;
+  const next = safeNext(session.loginNext);
   session.oauthState = undefined;
+  session.loginNext = undefined;
 
   if (error || !code || !state || state !== expectedState) {
     await session.save();
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
     }
 
     await session.save();
-    return redirectTo("/");
+    return redirectTo(next);
   } catch (e) {
     console.error(e);
     session.destroy();

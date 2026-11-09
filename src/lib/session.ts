@@ -9,6 +9,8 @@ export type SessionData = {
   expiresAt?: number;
   /** CSRF state for the OAuth round trip. */
   oauthState?: string;
+  /** Where to return after logging in (relative path). */
+  loginNext?: string;
 };
 
 function sessionOptions(): SessionOptions {
