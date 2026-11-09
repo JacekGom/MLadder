@@ -43,4 +43,4 @@ hosting Vercel.
    piosenek, link dla odbiorcy)
 3. Wypełnianie drabinki ✅ (losowe rozstawienie, pojedynki, opcjonalne
    odtwarzanie)
-4. Wynik dla nadawcy i dopracowanie widoku na telefonie
+4. Wynik dla nadawcy i dopracowanie widoku na telefonie ✅
