@@ -13,7 +13,7 @@ type PlayerResponse = {
 export async function GET() {
   const auth = await getRouteAuth();
   if (!auth) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const res = await spotifyFetch("/me/player", auth.token, { method: "GET" });
+  const res = await spotifyFetch("/me/player?market=from_token", auth.token, { method: "GET" });
   if (res.status === 204) return NextResponse.json({ active: false });
   if (!res.ok) return NextResponse.json({ active: false, error: res.status });
   const p: PlayerResponse = await res.json();
