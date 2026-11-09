@@ -1,7 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getRouteAuth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { ensureUser } from "@/lib/users";
 import { LADDER_SIZES, TRACK_ID_RE, type TrackSummary } from "@/lib/tracks";
+
+/** Logs the error and returns its message so the UI can show the cause. */
+function dbError(where: string, err: { message?: string; code?: string } | null) {
+  console.error(where, err);
+  const detail = err ? `${err.code ?? ""} ${err.message ?? ""}`.trim() : "unknown";
+  return NextResponse.json({ error: "db_error", detail: `${where}: ${detail}` }, { status: 500 });
+}
 
 type Body = { tracks?: unknown; message?: unknown };
 
@@ -56,15 +64,15 @@ export async function POST(req: NextRequest) {
   const message =
     typeof body.message === "string" ? body.message.trim().slice(0, 280) || null : null;
 
+  const userError = await ensureUser(db, auth.userId, auth.token);
+  if (userError) return dbError("users insert failed", userError);
+
   const { data: ladder, error } = await db
     .from("ladders")
     .insert({ sender_id: auth.userId, size: tracks.length, message })
     .select("id, share_token")
     .single();
-  if (error || !ladder) {
-    console.error("ladder insert failed", error);
-    return NextResponse.json({ error: "db_error" }, { status: 500 });
-  }
+  if (error || !ladder) return dbError("ladder insert failed", error);
 
   const { error: tracksError } = await db.from("ladder_tracks").insert(
     tracks.map((t) => ({
@@ -77,9 +85,8 @@ export async function POST(req: NextRequest) {
     })),
   );
   if (tracksError) {
-    console.error("ladder_tracks insert failed", tracksError);
     await db.from("ladders").delete().eq("id", ladder.id);
-    return NextResponse.json({ error: "db_error" }, { status: 500 });
+    return dbError("ladder_tracks insert failed", tracksError);
   }
 
   return NextResponse.json({ token: ladder.share_token }, { status: 201 });

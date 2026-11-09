@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getRouteAuth } from "@/lib/auth";
 import { loadLadder, TOKEN_RE } from "@/lib/ladder";
 import { supabaseAdmin } from "@/lib/supabase";
+import { ensureUser } from "@/lib/users";
 
 export async function POST(
   _req: Request,
@@ -16,6 +17,12 @@ export async function POST(
 
   const ladder = await loadLadder(db, token);
   if (!ladder) return NextResponse.json({ error: "not_found" }, { status: 404 });
+
+  const userError = await ensureUser(db, auth.userId, auth.token);
+  if (userError) {
+    console.error("ensureUser failed", userError);
+    return NextResponse.json({ error: "db_error" }, { status: 500 });
+  }
 
   const { data: ok, error } = await db.rpc("start_ladder", {
     p_ladder: ladder.id,
