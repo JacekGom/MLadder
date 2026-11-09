@@ -58,16 +58,25 @@ export async function POST(req: NextRequest) {
     typeof body.deviceId === "string" && /^[A-Za-z0-9]{1,100}$/.test(body.deviceId)
       ? body.deviceId
       : null;
-  if (!deviceId) {
+  // When the picked device is already the active one, don't name it:
+  // play?device_id=… makes Spotify "transfer" playback, which on iPhone
+  // stops the background app's audio and the new song never starts.
+  let target = "";
+  if (deviceId) {
+    target = `?device_id=${deviceId}`;
+  } else {
+    let picked: Device | null = null;
     try {
-      deviceId = (await pickDevice(auth.token, body.mobile === true))?.id ?? null;
+      picked = await pickDevice(auth.token, body.mobile === true);
     } catch (e) {
       console.error("devices failed", e);
     }
-    if (!deviceId) return NextResponse.json({ error: "no_device" }, { status: 409 });
+    if (!picked?.id) return NextResponse.json({ error: "no_device" }, { status: 409 });
+    deviceId = picked.id;
+    if (!picked.is_active) target = `?device_id=${deviceId}`;
   }
 
-  const res = await spotifyFetch(`/me/player/play?device_id=${deviceId}`, auth.token, {
+  const res = await spotifyFetch(`/me/player/play${target}`, auth.token, {
     method: "PUT",
     body: { uris: [`spotify:track:${trackId}`] },
   });
